@@ -1,11 +1,6 @@
 from PIL import Image
 import numpy as np
 
-#split image
-#split fen
-#map image to fen
-#create uuid filename for image
-#save the image to the specified fen label
 
 def split_img(img, width, length):
 
