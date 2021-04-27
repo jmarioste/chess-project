@@ -19,6 +19,9 @@ def split_img(img, width, length):
     
     return tiles
 
+def sample_diff_func():
+    return None
+
 if __name__ == '__main__':
     img = Image.open('./img/example1.png').convert('RGB')
     img = img.resize((512,512))
@@ -28,7 +31,7 @@ if __name__ == '__main__':
 
     tiles = enumerate(tiles)
     
-    
+
     for count, tile in tiles:
         tile_img = Image.fromarray(np.uint8(tile))
         tile_img.save(f'./test/Image-{count}.jpg')
