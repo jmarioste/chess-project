@@ -15,7 +15,8 @@ def split_img(img, width, length):
     tiles = []
     for x in range(0, img_width, width): 
         for y in range(0, img_length, length):
-            tiles.append(img[x:x+width, y:y+length])
+            cropped = img[x:x+width, y:y+length]
+            tiles.append(cropped)
     
     return tiles
 
