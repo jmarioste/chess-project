@@ -11,50 +11,53 @@ import boto3
 from botocore.config import Config
 
 import utils
-import ChessVision_config as conf
+import constants as const
 
 
-def inititalize_credentials():
-    identity_client = boto3.client('cognito-identity', config=conf.my_config)
+class ChessVisionWrapper:
+    def __init__(self, identity_pool_id):
+        self.config = Config(region_name=const.AWS_REGION_NAME)
+        self.identity_pool_id = identity_pool_id
 
-    identity_id = identity_client.get_id(
-        IdentityPoolId='eu-central-1:d06d1df9-443e-49e3-84e8-d90aacb9b333'
-    )['IdentityId']
+        self.init_identity_client()
+        self.init_lambda_client()
+        pass
 
-    response = identity_client.get_credentials_for_identity(
-        IdentityId=identity_id
-    )
-    
-    credentials = response['Credentials']
-    return credentials
+    def init_identity_client(self):
+        self.identity_client = boto3.client('cognito-identity',
+                                            config=self.config)
 
+    def init_lambda_client(self):
+        credentials = self.get_credentials()
+        self.lambda_client = boto3.client(
+            'lambda',
+            aws_access_key_id=credentials['AccessKeyId'],
+            aws_secret_access_key=credentials['SecretKey'],
+            aws_session_token=credentials['SessionToken'],
+            config=self.config
+        )
 
-def initialize_lambda_client():
-    global lambda_client
-    credentials = inititalize_credentials()
-    lambda_client = boto3.client(
-        'lambda',
-        aws_access_key_id=credentials['AccessKeyId'],
-        aws_secret_access_key=credentials['SecretKey'],
-        aws_session_token=credentials['SessionToken'], 
-        config=conf.my_config
-    )
+    def get_credentials(self):
+        identity_id = self.identity_client.get_id(
+            IdentityPoolId=self.identity_pool_id
+        )['IdentityId']
 
+        response = self.identity_client.get_credentials_for_identity(
+            IdentityId=identity_id
+        )
 
-def invoke_lambda(json_payload):
-    response = lambda_client.invoke(
-        FunctionName=conf.function_name,
-        InvocationType='RequestResponse',
-        Payload=json_payload
-    )
+        credentials = response['Credentials']
+        return credentials
 
-    data = json.loads(response['Payload'].read())
+    def invoke_lambda_fn(self, json_string):
+        response = self.lambda_client.invoke(
+            FunctionName=const.AWS_FUNCTION_NAME,
+            InvocationType='RequestResponse',
+            Payload=json_string
+        )
 
-    if data['statusCode'] == 200:
+        data = json.loads(response['Payload'].read())
         return json.loads(data['body'])
-    else:
-        print(data['statusCode'])
-        return data
 
 
 def get_json_from_img(path):
@@ -67,23 +70,23 @@ def get_json_from_img(path):
         'flip': False
     })
 
-
-def get_fen_from_dir(credentials, chessboards_dir):
+# functions below should be outside chessvision wrapper
+def get_fen_from_dir(chessboards_dir):
     # chessboards_dir = '/mnt/g/Documents/Chess/1001 Chess Exercises for Club Players/output/cb_sample_300/'
     chessboard_images = utils.get_filenames_from_dir(chessboards_dir)
-
     chessboard_images.sort(key=utils.alphanum_key)
+    wrapper = ChessVisionWrapper(const.AWS_IDENTITY_POOL_ID)
 
     for img_path in chessboard_images:
         json_data = get_json_from_img(path.join(chessboards_dir, img_path))
-        response_data = invoke_lambda(credentials, json_data)
+        response_data = wrapper.invoke_lambda_fn(credentials, json_data)
         print(response_data['FEN'])
 
 
 def sample():
     data = get_json_from_img('./img/Image-2.jpg')
-    initialize_lambda_client()
-    response_data = invoke_lambda(data)
+    wrapper = ChessVisionWrapper(const.AWS_IDENTITY_POOL_ID)
+    response_data = wrapper.invoke_lambda_fn(data)
     print(response_data['FEN'])
 
 
